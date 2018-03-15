@@ -4,12 +4,6 @@ trait Machine[G, S <: Machine.TState, E <: Machine.TEvent] extends ((S, G) => Ma
 
 	private type Handler = Option[(S, (G, S, E, S) => G)]
 
-	protected def parent: Machine[G, S, E]
-
-	protected def states: Set[S] = parent.states
-
-	protected def handle(from: S, event: E): Handler = parent.handle(from, event)
-
 	/**
 		* add a state that the machine may assume
 		*/
@@ -72,32 +66,15 @@ trait Machine[G, S <: Machine.TState, E <: Machine.TEvent] extends ((S, G) => Ma
 			ghost
 		)
 	}
+
+	protected def parent: Machine[G, S, E]
+
+	protected def states: Set[S] = parent.states
+
+	protected def handle(from: S, event: E): Handler = parent.handle(from, event)
 }
 
 object Machine {
-
-	trait TEvent
-
-	trait TState
-
-	case class Shell[G, S <: TState, E <: TEvent]
-	(
-		machine: Machine[G, S, E],
-		state: S,
-		ghost: G
-	) {
-		def !(event: E): Shell[G, S, E] =
-			machine.handle(state, event) match {
-				case None =>
-					this
-				case Some((into: S, handler)) =>
-					Shell[G, S, E](
-						machine,
-						into,
-						handler(ghost, state, event, into)
-					)
-			}
-	}
 
 	/**
 		* Lets you match on the state/ghost
@@ -120,5 +97,28 @@ object Machine {
 			override protected def parent: Machine[G, S, E] =
 				sys.error("This is the root-machine. This accessor shouldn't be invoked.")
 		}
+	}
+
+	trait TEvent
+
+	trait TState
+
+	case class Shell[G, S <: TState, E <: TEvent]
+	(
+		machine: Machine[G, S, E],
+		state: S,
+		ghost: G
+	) {
+		def !(event: E): Shell[G, S, E] =
+			machine.handle(state, event) match {
+				case None =>
+					this
+				case Some((into: S, handler)) =>
+					Shell[G, S, E](
+						machine,
+						into,
+						handler(ghost, state, event, into)
+					)
+			}
 	}
 }
